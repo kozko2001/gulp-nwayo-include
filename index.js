@@ -6,7 +6,7 @@ var fs = require('fs'),
 	_ = require('lodash');
 
 
-var DIRECTIVE_REGEX = /^[\/\s#]*?=\s*?((?:require|include|jshtml)(?:_tree|_directory)?)\s+<?([^>]*)>?\s*$/mg;
+var DIRECTIVE_REGEX = /^[\/\s#]*?=\s*?((?:require|include|jshtml)(?:_tree|_directory)?)\s+[<"]?([^">]*)[">]?\s*$/mg
 var COMMENT_REGEX = /\s*([^\s=]+)\s*=/;
 var EXTENSION = {
 	jshtml: 'jshtml'
@@ -21,19 +21,23 @@ module.exports = function (params) {
 	params = params || {};
 	requiredFiles = {};
 	extensions = [];
-	basePath = '';
-	autoExtension = '';
+	basePath = [];
+	autoExtension = [];
 
 	if (params.extensions) {
 		extensions = typeof params.extensions === 'string' ? [params.extensions] : params.extensions;
 	}
+
 	if (params.basePath && typeof params.basePath === 'string') {
         if(! path.isAbsolute(params.basePath)) {
-            basePath = path.normalize(process.cwd() + path.sep + params.basePath);
+            basePath = [path.normalize(process.cwd() + path.sep + params.basePath)];
         } else {
-            basePath = params.basePath;
+            basePath = [params.basePath];
         }
-	}
+	} else if (params.basePath) {
+        basePath = params.basePath;
+    }
+
 	if (params.autoExtension) {
 		autoExtension = typeof params.autoExtension === 'boolean' ? params.autoExtension : false;
 	}
@@ -202,6 +206,10 @@ function globMatch(match, filePath) {
 	return files;
 }
 
+function endsWith(str, suffix) {
+  return str.indexOf(suffix, str.length - suffix.length) !== -1;
+}
+
 function _internalGlob(thisGlob, filePath, directiveType) {
 	var
 		ext =
@@ -212,8 +220,29 @@ function _internalGlob(thisGlob, filePath, directiveType) {
 				) :
 				'',
 		folderPath = path.dirname(filePath),
-		fullPath = path.join((basePath !== '') ? basePath : folderPath, thisGlob.replace(/['"]/g, '') + ext),
+		searchPath = basePath.concat([folderPath]),
 		files;
+
+    // generate all the probably paths for the filename
+    var fullPath =  _.map(searchPath, function(currentPath) {
+		var fullPath = path.join(currentPath, thisGlob.replace(/['"]/g, ''));
+		if(! endsWith(fullPath, ext) ) {
+			fullPath = fullPath + ext;
+		}
+		return fullPath;
+	});
+
+    // see witch of this path exists
+	fullPath = _.filter(fullPath, function(file) {
+		return fs.existsSync(file);
+	});
+
+	if(fullPath.length > 0) {
+		fullPath = _.first(fullPath);
+    } else {
+		console.log("ERROR: no file found with glob:" + thisGlob);
+		return [];
+    }
 
 	files = glob.sync(fullPath, {
 		mark: true
