@@ -6,7 +6,7 @@ var fs = require('fs'),
 	_ = require('lodash');
 
 
-var DIRECTIVE_REGEX = /^[\/\s#]*?=\s*?((?:require|include|jshtml)(?:_tree|_directory)?)\s+(.*$)/mg;
+var DIRECTIVE_REGEX = /^[\/\s#]*?=\s*?((?:require|include|jshtml)(?:_tree|_directory)?)\s+<?([^>]*)>?\s*$/mg;
 var COMMENT_REGEX = /\s*([^\s=]+)\s*=/;
 var EXTENSION = {
 	jshtml: 'jshtml'
@@ -27,8 +27,12 @@ module.exports = function (params) {
 	if (params.extensions) {
 		extensions = typeof params.extensions === 'string' ? [params.extensions] : params.extensions;
 	}
-	if (params.basePath) {
-		basePath = typeof params.basePath === 'string' ? path.normalize(process.cwd() + path.sep + params.basePath) : '';
+	if (params.basePath && typeof params.basePath === 'string') {
+        if(! path.isAbsolute(params.basePath)) {
+            basePath = path.normalize(process.cwd() + path.sep + params.basePath);
+        } else {
+            basePath = params.basePath;
+        }
 	}
 	if (params.autoExtension) {
 		autoExtension = typeof params.autoExtension === 'boolean' ? params.autoExtension : false;
